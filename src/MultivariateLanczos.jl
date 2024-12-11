@@ -1,11 +1,11 @@
-using LinearAlgebra, ITensors, Combinatorics
+using LinearAlgebra, Combinatorics
 include("utils.jl")
 
 """
-    MultivariateLanczos(A::Dict{String, Matrix{Float64}}, b::Vector{Float64}, n::Int64, m::Int64)
+    MultivariateLanczos(A::Vector{Matrix{Float64}}, b::Vector{Float64}, n::Int64, m::Int64)
 
     Inputs-
-        A : {Pair(s1, A1), Pair(s2, A2), ..., Pair(sk, Ak)} is a dictionary pairing user-defined names for each variable si and its corresponding n x n support matrix Ai. Requires all matrices A1,...,Ak be Hermitian and simultaneously diagonalizable (i.e. commuting). Also requires that no variable name equals "MOP_value".
+        A : An ordered list of n x n support matrices Ai. Requires all matrices A1,...,Ak be Hermitian and simultaneously diagonalizable (i.e. commuting).
 
         b : Starting weight vector.
 
@@ -14,45 +14,51 @@ include("utils.jl")
         m : Maximum polynomial degree desired.
 
     Outputs-
-        I : Dictionary mapping variable names to ITensor indices 
+        T : Dict{Tuple,Float64} indexed by ((i1,i2,...,ik), (j1,j2,...,jk)) such that T[((i1,i2,...,ik), (j1,j2,...,jk))] equals the recurrence coefficent in the multivariate orthogonal polynomial basis for the polynomial with leading term s1^(i1) * s2^(i2) * ... * sk^(ik) in terms of the polynomial with leading term s1^(j1) * s2^(j2) * ... * sk^(jk). The variables s1,...,sk are ordered by the input list A.
 
-        T : ITensor indexed by (s1,s2,...,sk) such that T(s1=>i1, ..., sk=>ik) equals the recurrence coefficent in the multivariate orthogonal polynomial basis for the polynomial with leading term s1^(i1-1) * s2^(i2-1) * ... * sk^(ik-1).
-
-        Q : ITensor indexed by (s1,s2,...,sk, MOP_value) such that T(s1=>i1, ..., sk=>ik, MOP_value => 1:n) equals the orthogonal polynomial with leading term s1^(i1-1) * s2^(i2-1) * ... * sk^(ik-1) evaluated over the support (spectrum of matrices Ai).
+        Q : Dict{Tuple,Vector} indexed by (i1,i2,...,ik) such that T[(i1, ..., ik)] equals the orthogonal polynomial with leading term s1^(i1) * s2^(i2) * ... * sk^(ik) evaluated over the support (spectrum of matrices Ai).
 """
 function MultivariateLanczos(A,b,n,m)
-    VECTOR_DIM_NAME = "MOP_value"
-
+    TOL = 0.0001 # tolerance for orthogonality
     k = length(A) # number of variables
-    names_ordered = keys(A)
-    tensor_indices = Tuple([Index(m+1,i) for i in names_ordered])
-    vector_index = Index(n, VECTOR_DIM_NAME)
-    indices_with_vector = (vector_index, tensor_indices...)
 
-    T = ITensor(tensor_indices...)
-    Q = ITensor(indices_with_vector...)
+    T = Dict{Tuple,Float64}()
+    Q = Dict{Tuple,Vector}()
 
-    zero_index = make_index(tensor_indices, ones(Int32, k))
-    Q[(vector_index=>1, zero_index...)...] = 0.0 # need tensor to be nonempty
-    T[zero_index...] = norm(b)
-    Q[(vector_index=>:, zero_index...)...] = b / norm(b)
+    zero_index = Tuple(zeros(Int32, k))
+    T[zero_index] = norm(b)
+    Q[zero_index] = b / norm(b)
 
     for i=1:m # i = total degree
         for var=1:k
             num_active_vars = k - var + 1
-            prev_monomials = i > 0 ? integer_partitions(i-1) : [[]]
-            prev_indices = [generate_indices for degs in prev_monomials]
+            prev_monomials = i > 1 ? integer_partitions(i-1) : [[0]]
+            prev_indices = [generate_indices(monom, num_active_vars,k) for monom in prev_monomials]
 
             for index_set in prev_indices # index set contains all monomials with same partition
                 for index in index_set
-                    tensor_index = make_index(tensor_indices, index)
-                    v = 
+                    if !haskey(Q,index)
+                        continue
+                    end
 
-                    T[zero_index...] = norm(b)
-                    Q[(vector_index=>:, zero_index...)...] = b / norm(b)
+                    v = Q[index]
+                    q = A[var] * v
+                    q = q/norm(q)
+                    next_index = increment_index(index, var)
+
+                    # orthogonalize q against all previous vectors, can be optimized
+                    for (vec_index, vec) in pairs(Q)
+                        t = (vec' * q)
+                        T[(vec_index, next_index)] = t
+                        q = q - t * vec
+                    end
+                    if norm(q) > TOL
+                        T[next_index] = norm(q)
+                        Q[next_index] = q / norm(q)
+                    end
                 end
             end
         end
     end
-    return Q
+    return (T,Q)
 end
