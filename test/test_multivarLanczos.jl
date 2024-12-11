@@ -9,7 +9,7 @@ using LinearAlgebra
         input_A = [A1,A2];
         b = randn(n);
 
-        (T,Q) = MultivariateLanczos(input_A,b,n,m);
+        (T,Q) = MultivariateLanczos(input_A,b,m);
     end
     @testset "Q orthogonal for real bivariate diagonal" begin
         n=5; m=4;
@@ -18,7 +18,7 @@ using LinearAlgebra
         input_A = [A1,A2];
         b = randn(n);
 
-        (T,Q) = MultivariateLanczos(input_A,b,n,m)
+        (T,Q) = MultivariateLanczos(input_A,b,m)
         
         #test Q orthonormal
         k = length(Q)
@@ -40,7 +40,7 @@ using LinearAlgebra
         input_A = [A1,A2,A3,A4];
         b = randn(n);
 
-        (T,Q) = MultivariateLanczos(input_A,b,n,m)
+        (T,Q) = MultivariateLanczos(input_A,b,m)
         
         #test Q orthonormal
         k = length(Q)

@@ -9,8 +9,6 @@ include("utils.jl")
 
         b : Starting weight vector.
 
-        n : Dimension of support matrices Ai.
-
         m : Maximum polynomial degree desired.
 
     Outputs-
@@ -18,11 +16,11 @@ include("utils.jl")
 
         Q : Dict{Tuple,Vector} indexed by (i1,i2,...,ik) such that T[(i1, ..., ik)] equals the orthogonal polynomial with leading term s1^(i1) * s2^(i2) * ... * sk^(ik) evaluated over the support (spectrum of matrices Ai).
 """
-function MultivariateLanczos(A,b,n,m)
-    TOL = 0.0001 # tolerance for orthogonality
+function MultivariateLanczos(A,b,m)
+    TOL = 0.00001 # tolerance for orthogonality
     k = length(A) # number of variables
 
-    T = Dict{Tuple,Float64}()
+    T = Dict{Tuple,ComplexF64}()
     Q = Dict{Tuple,Vector}()
 
     zero_index = Tuple(zeros(Int32, k))
@@ -49,8 +47,10 @@ function MultivariateLanczos(A,b,n,m)
                     # orthogonalize q against all previous vectors, can be optimized
                     for (vec_index, vec) in pairs(Q)
                         t = (vec' * q)
-                        T[(vec_index, next_index)] = t
-                        q = q - t * vec
+                        if abs(t) > TOL
+                            T[(vec_index, next_index)] = t
+                            q = q - t * vec
+                        end
                     end
                     if norm(q) > TOL
                         T[next_index] = norm(q)

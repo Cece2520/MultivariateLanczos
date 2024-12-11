@@ -1,11 +1,11 @@
 function pad_partition(partition, total_vars)
-    new_partition = zeros(total_vars)
+    new_partition = zeros(Int32, total_vars)
     new_partition[1:length(partition)] = partition
     return new_partition
 end
 
 function pad_indices(permutation, num_active_vars, total_vars)
-    new_index = zeros(total_vars)
+    new_index = zeros(Int32, total_vars)
     new_index[(total_vars - num_active_vars + 1):end] = permutation
     return Tuple(new_index)
 end
